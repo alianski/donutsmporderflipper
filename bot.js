@@ -21,6 +21,7 @@ const io = socketio(server);
 
 // Serve static files
 app.use(express.static('public'));
+app.get("/ping", (req, res) => res.send("OK"));
 
 
 io.on('connection', (socket) => {
