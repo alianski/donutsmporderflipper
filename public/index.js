@@ -6,7 +6,6 @@ console.log(tokenid)
 
 let accountName = null
 let loginCode = null
-let admin = false
 
 socket.on('chat', data => {
   const chatBox = document.getElementById('chat');
@@ -21,18 +20,17 @@ socket.on("data", data => {
     if ("tokenid" in data){
         localStorage.setItem('donutcasinotoken', data["tokenid"]);
     }
-    if ("accountName" in data){
-        accountName = data["accountName"]
-        console.log(accountName)
-    }
     if ("code" in data){
         loginCode = data["code"]
         console.log(loginCode)
         document.getElementById('loginCommand').textContent = `To link your account send command /msg AlianskiToJa login ${loginCode}`;
     }
-    if ("admin" in data){
-        admin = data["admin"]
-        console.log(admin)
+    if ("accountName" in data){
+        accountName = data["accountName"]
+        console.log(accountName)
+        if (accountName == null){}else{
+          document.getElementById('loginCommand').textContent = `You have linked your account with ${accountName}`;
+        }
     }
 })
 
