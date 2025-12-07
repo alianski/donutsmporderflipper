@@ -3,6 +3,8 @@ const express = require('express');
 const http = require('http');
 const socketio = require('socket.io');
 const { isPromise } = require('util/types');
+const path = require('path');
+const fs = require('fs');
 
 // Create bot
 const bot = mineflayer.createBot({
@@ -23,16 +25,78 @@ const io = socketio(server);
 app.use(express.static('public'));
 app.get("/ping", (req, res) => res.send("OK"));
 
+let commandQueue = []
+
+let players = {}
+let connectedTokens = {}
+
+function generateRandomToken(length) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+
+  do {
+    result = '';
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      result += characters[randomIndex];
+    }
+  } while (players.hasOwnProperty(result));
+
+  return result;
+}
+
+
+function saveUsers(datatosave){
+    for (let key in datatosave) {
+        console.log(key)
+        jsonData = JSON.stringify(datatosave[key], null, 2);
+        dirPath = path.join(path.join(__dirname, 'savedata'), "users")
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath);
+        }
+        const filePath = path.join(dirPath, key+'.json');
+        fs.writeFile(filePath, jsonData, (err) => {
+            if (err) {
+                console.error('Error writing to file:', err);
+            } else {}
+        });   
+    }
+}
+
+function saveUser(tokenid){
+  let data = {}
+  data[tokenid] = players[tokenid]
+  saveUsers(data)
+}
 
 io.on('connection', (socket) => {
+  console.log(socket.id)
+  socket.on('disconnect', () => {
+      delete players[connectedTokens[socket.id]]
+      delete connectedTokens[socket.id]
+      console.log('User disconnected',socket.id);
+  });
+  connectedTokens[socket.id] = null
+  socket.on("tokenId", (tokenid) =>{
+    console.log(players)
+    saveUsers(players)
+    if (tokenid == null){
+      tokenid = generateRandomToken(16)
+    }
+    connectedTokens[socket.id] = tokenid
+    try {
+      players[tokenid] = require("./savedata/users/"+tokenid+".json")
+    }catch{
+      const newPlayer = {"tokenid": tokenid, "accountName": null, "code": generateRandomToken(6), "admin": false}
+      players[tokenid] = newPlayer
+    }
+    socket.emit("data", players[tokenid])
+    saveUser(tokenid)
+  })
   socket.on('sendChat', (msg) => {
-    if (bot && bot.chat) {
-      if (msg == ".dumpall"){
-        dumpInventoryToCurrentGUI(bot)
-      }else{
-        bot.chat(msg);
-        console.log(`Sent to chat: ${msg}`);
-      }
+    if (bot && players[connectedTokens[socket.id]]["admin"]) {
+      commandQueue[commandQueue.length] = msg
+      console.log(commandQueue)
     }
   });
 
@@ -53,10 +117,33 @@ bot.once('spawn', () => {
 })
 
 
+function parseLoginString(str) {
+  // Get the part before "->"
+  const name = str.split("->")[0].trim();
+
+  // Regex to capture the word after "login"
+  const match = str.match(/login\s+(\S+)/);
+  const code = match ? match[1] : null;
+
+  return { name, code };
+}
+
+
 // Send chat and position updates to browser
 bot.on('message', (jsonMsg) => {
   const msg = jsonMsg.toString();
-  // io.emit("chat", msg)
+  if (msg.includes("-> YOU: login")){
+    let result = parseLoginString(msg);
+    console.log(result.name)
+    console.log(result.code)
+    console.log(players)
+    Object.values(players).forEach(value => {
+      if (value["code"] == result.code){
+        value["accountName"] = result.name
+      }
+      saveUser(value["tokenid"])
+    });
+  }
 });
 
 bot.on('kicked', (reason, loggedIn) => {
@@ -237,6 +324,13 @@ async function startLoop() {
       io.emit("chat", bot.currentWindow.title.value+"211")
       bot.closeWindow(bot.currentWindow)
       await sleep(1000)
+      
+      for (let i = 0; i < commandQueue.length; i++) {
+        bot.chat(commandQueue[i]);
+        console.log(`Sent to chat: ${commandQueue[i]}`);
+        await sleep(1000)
+      }
+      commandQueue = []
 
     } catch (err) {
       console.log('Loop error:', err)
