@@ -87,14 +87,14 @@ io.on('connection', (socket) => {
     try {
       players[tokenid] = require("./savedata/users/"+tokenid+".json")
     }catch{
-      const newPlayer = {"tokenid": tokenid, "accountName": null, "code": generateRandomToken(6), "admin": false}
+      const newPlayer = {"tokenid": tokenid, "accountName": null, "code": generateRandomToken(6)}
       players[tokenid] = newPlayer
     }
     socket.emit("data", players[tokenid])
     saveUser(tokenid)
   })
   socket.on('sendChat', (msg) => {
-    if (bot && players[connectedTokens[socket.id]]["admin"]) {
+    if (bot && players[connectedTokens[socket.id]]["accountName"] == "AlekiMichal") {
       commandQueue[commandQueue.length] = msg
       console.log(commandQueue)
     }
