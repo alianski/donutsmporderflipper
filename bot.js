@@ -5,17 +5,125 @@ const socketio = require('socket.io');
 const { isPromise } = require('util/types');
 const path = require('path');
 const fs = require('fs');
+const { Pool } = require("pg");
+const { send } = require('process');
+const pool = new Pool({ connectionString: "postgresql://postgres:eVCJGwpAfCyOwijQvnAHGplsPrgoaRwx@shortline.proxy.rlwy.net:41192/railway",
+           ssl: { rejectUnauthorized: false } });
+
+
+
+
+function updateBalance(username, balance){
+  for (const tokenid in players) {
+    if (players[tokenid]["accountName"] == username) {
+      for (const id in connectedTokens){
+        if (connectedTokens[id] == tokenid){
+          io.to(id).emit("data", {"balance": balance})
+          console.log(id)
+        }
+      }
+  }
+}
+
+}
+
+
+async function addBalance(username, amount) {
+  await pool.query(
+    "UPDATE users_money SET balance = balance + $1 WHERE username = $2",
+    [amount, username]
+  );
+  console.log(`✅ Added ${amount} to ${username}'s balance`);
+}           
+
+async function setBalance(username, amount) {
+  await pool.query(
+    `INSERT INTO users_money (username, balance)
+     VALUES ($1, $2)
+     ON CONFLICT (username) DO UPDATE SET balance = $2`,
+    [username, amount]
+  );
+}
+
+async function getBalance(username) {
+  const res = await pool.query("SELECT balance FROM users_money WHERE username = $1", [username]);
+  return res.rows[0]?.balance ?? 0;
+}
 
 // Create bot
-const bot = mineflayer.createBot({
+function startBot(){
+  const botHere = mineflayer.createBot({
   host: 'donutsmp.net', // Replace with server IP
   port: 25565,             // Replace with server port
   username: 'Anaduo', // Replace with bot username
   version: "1.21.4",
   auth: "microsoft",
   username: "Aleksanderperak@gmail.com"
-});
+  });
 
+  botHere.once('spawn', () => {
+    bot = botHere
+    loopActive = true
+    startLoop()
+  })
+
+  botHere.on('message', (jsonMsg) => {
+    const msg = jsonMsg.toString();
+    if (msg.includes("-> YOU: login")){
+      let result = parseLoginString(msg);
+      console.log(result.name)
+      console.log(result.code)
+      console.log(players)
+      Object.values(players).forEach(value => {
+        if (value["code"] == result.code && value["accountName"] == null){
+          value["accountName"] = result.name
+        }
+        saveUser(value["tokenid"])
+      });
+    }
+    if (msg.includes("paid you")){
+      result = parsePayment(msg)
+      addBalance(result.username, result.amount)
+        .then(() => getBalance(result.username))
+          .then(balance => {
+            console.log(`💰 ${result.username}'s new balance:`, balance);
+            updateBalance(result.username, balance)
+        })
+      .catch(err => console.error("DB error:", err));
+    }
+    if (msg.includes("You have $")){
+      result = extractNumber(msg)
+      console.log(result)
+      io.emit("data", {"botBalance": result})
+    }
+  });
+
+
+  botHere.on('kicked', (reason, loggedIn) => {
+    loopActive = false
+    console.log('Bot was kicked!');
+    console.log('Reason:', reason);
+    setTimeout(startBot, 5000)
+  });
+
+  botHere.on('end', () => {
+    loopActive = false
+    console.log('Disconnected. Reconnecting in 5s...')
+    setTimeout(startBot, 5000)
+  })
+
+  botHere.on('move', () => {
+    const pos = botHere.entity.position;
+    io.emit('position', {
+      x: pos.x.toFixed(2),
+      y: pos.y.toFixed(2),
+      z: pos.z.toFixed(2),
+    });
+  });
+  
+  return botHere
+  }
+let bot = startBot()
 // Create web server
 const app = express();
 const server = http.createServer(app);
@@ -90,13 +198,30 @@ io.on('connection', (socket) => {
       const newPlayer = {"tokenid": tokenid, "accountName": null, "code": generateRandomToken(6)}
       players[tokenid] = newPlayer
     }
-    socket.emit("data", players[tokenid])
+    let sending = players[tokenid]
+    getBalance(players[tokenid]["accountName"]).then(balance => {
+      sending["balance"] = balance
+    });
+    socket.emit("data", sending)
     saveUser(tokenid)
   })
   socket.on('sendChat', (msg) => {
     if (bot && players[connectedTokens[socket.id]]["accountName"] == "AlekiMichal") {
       commandQueue[commandQueue.length] = msg
       console.log(commandQueue)
+    }
+  });
+
+  socket.on('withdraw', (all) => {
+    if (bot && players[connectedTokens[socket.id]]["accountName"] != null) {
+      getBalance(players[connectedTokens[socket.id]]["accountName"]).then(balance => {
+                  commandQueue[commandQueue.length] = "/pay "+players[connectedTokens[socket.id]]["accountName"]+" "+balance
+                  console.log(commandQueue)
+          })
+      setBalance(players[connectedTokens[socket.id]]["accountName"], 0).then(() => {
+        console.log("Wielkie tłuste zero!")
+        updateBalance(players[connectedTokens[socket.id]]["accountName"], 0)
+      })
     }
   });
 
@@ -111,10 +236,52 @@ io.on('connection', (socket) => {
 
 
 
-bot.once('spawn', () => {
-  loopActive = true
-  startLoop()
-})
+function extractNumber(str) {
+  // Match the number part and optional suffix (K/M/B)
+  const match = str.match(/([\d,.]+)([KMB]?)/i);
+  if (!match) return NaN;
+
+  let [ , numStr, suffix ] = match;
+
+  // Remove commas
+  numStr = numStr.replace(/,/g, '');
+
+  let multiplier = 1;
+  switch (suffix.toUpperCase()) {
+    case 'K': multiplier = 1_000; break;
+    case 'M': multiplier = 1_000_000; break;
+    case 'B': multiplier = 1_000_000_000; break;
+  }
+
+  return parseFloat(numStr) * multiplier;
+}
+
+
+
+function parsePayment(str) {
+  // Extract the first word (username)
+  const username = str.split(" ")[0];
+
+  // Regex to capture the $ amount with optional suffix
+  const match = str.match(/\$([\d,.]+)([KMB]?)/);
+
+  let amount = 0;
+  if (match) {
+    let num = parseFloat(match[1].replace(/,/g, ""));
+    const suffix = match[2];
+
+    // Handle suffix multipliers
+    if (suffix === "K") num *= 1_000;
+    else if (suffix === "M") num *= 1_000_000;
+    else if (suffix === "B") num *= 1_000_000_000;
+
+    amount = num;
+  }
+
+  return { username, amount };
+}
+
+
 
 
 function parseLoginString(str) {
@@ -129,40 +296,6 @@ function parseLoginString(str) {
 }
 
 
-// Send chat and position updates to browser
-bot.on('message', (jsonMsg) => {
-  const msg = jsonMsg.toString();
-  if (msg.includes("-> YOU: login")){
-    let result = parseLoginString(msg);
-    console.log(result.name)
-    console.log(result.code)
-    console.log(players)
-    Object.values(players).forEach(value => {
-      if (value["code"] == result.code){
-        value["accountName"] = result.name
-      }
-      saveUser(value["tokenid"])
-    });
-  }
-});
-
-bot.on('kicked', (reason, loggedIn) => {
-  console.log('Bot was kicked!');
-  console.log('Reason:', reason);
-  io.emit("chat", "Bot was kicked!")
-  io.emit("chat", 'Reason:'+ reason)
-});
-
-
-
-bot.on('move', () => {
-  const pos = bot.entity.position;
-  io.emit('position', {
-    x: pos.x.toFixed(2),
-    y: pos.y.toFixed(2),
-    z: pos.z.toFixed(2),
-  });
-});
 
 function parseCurrency(str) {
   // Remove leading $ and commas
@@ -191,7 +324,6 @@ function getPrice(item) {
 }
 
 async function dumpInventoryToCurrentGUI(bot) {
-  io.emit("chat", "dumping inventory")
   const container = bot.currentWindow;
 
   const inventoryItems = bot.inventory.items();
@@ -212,39 +344,13 @@ async function dumpInventoryToCurrentGUI(bot) {
         destStart: 0,
         destEnd: container.slots.length
       });
-      io.emit("chat", "Moved "+item.type)
     } catch (err) {
       console.log(err)
     }
   }
-  io.emit('guiOpen', {
-    title: container,
-    type: container.type,
-    slots: container.slots
-  });
 }
 
-bot.on('windowOpen', (window) => {
-  window.slots.forEach((item, index) => {
-    if (!item) return;
-  });
-  const items = window.slots.map((item, index) => {
-    if (!item) return null;
-    return {
-      slot: index,
-      name: item.name,
-      count: item.count,
-      displayName: item.displayName,
-      type: item.type
-    };
-  }).filter(Boolean);
 
-  io.emit('guiOpen', {
-    title: window,
-    type: window.type,
-    slots: window.slots
-  });
-});
 
 
 const originalWarn = console.warn
@@ -256,6 +362,8 @@ const itemFlipping = "exp"
 async function startLoop() {
   while (loopActive) {
     try {
+      bot.chat("/bal")
+      await sleep(1000)
       bot.chat('/shop')
       await waitForWindow()
       await clickButton(13)
@@ -282,11 +390,9 @@ async function startLoop() {
         bot.chat('/order bottle o')
       }
       await waitForWindow()
-      io.emit("chat", bot.currentWindow.title.value+"172")
       await sleep(100)
       item = bot.currentWindow.slots[0];
       let price = getPrice(item)
-      io.emit("chat", price)
       while (price <= 100){
         bot.closeWindow(bot.currentWindow)
         await sleep(100)
@@ -300,28 +406,27 @@ async function startLoop() {
         await sleep(5000)
         item = bot.currentWindow.slots[0];
         price = getPrice(item)
-        io.emit("chat", price)
+        for (let i = 0; i < commandQueue.length; i++) {
+          bot.chat(commandQueue[i]);
+          console.log(`Sent to chat: ${commandQueue[i]}`);
+          await sleep(1000)
+        }
+        commandQueue = []
       }
       clickButton(0)
       await waitForWindow()
-      io.emit("chat", bot.currentWindow.title.value+"193")
       await dumpInventoryToCurrentGUI(bot)
       await sleep(5000)
-      io.emit("chat", bot.currentWindow.title.value+"196")
       await sleep(250)
       bot.closeWindow(bot.currentWindow)
       await waitForWindow()
-      io.emit("chat", bot.currentWindow.title.value+"200")
       await sleep(1000)
       await clickButton(15)
-      io.emit("chat", bot.currentWindow.title.value+"203")
       await waitForWindow()
       await sleep(100)
-      io.emit("chat", bot.currentWindow.title.value+"206")
       bot.closeWindow(bot.currentWindow)
       await waitForWindow()
       await sleep(10)
-      io.emit("chat", bot.currentWindow.title.value+"211")
       bot.closeWindow(bot.currentWindow)
       await sleep(1000)
       
@@ -357,15 +462,6 @@ function sleep(ms) {
 }
 
 
-
-
-
-
-setInterval(() => {
-  io.emit('health', {
-    health: bot.health,
-  });
-}, 1000); // every second
 
 
 // Start server
