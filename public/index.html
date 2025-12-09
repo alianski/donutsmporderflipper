@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Minecraft Bot Viewer</title>
+  <title>Donut SMP casino</title>
   <style>
     body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
     #chat { max-height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 20px; }
@@ -9,18 +9,15 @@
   </style>
 </head>
 <body>
-  <h1>Minecraft Bot Viewer</h1>
+  <h1>Donut SMP casino</h1>
+  <div id="balance">Balance: $0</div>
+  <button onclick="withdrawmoney()">Withdraw</button>
   <div id="chat-input">
-  <input type="text" id="chatMessage" placeholder="Type a message..." />
-  <button onclick="sendChat()">Send</button>
-</div>
-  <div id="chat"></div>
+    <input type="text" id="chatMessage" placeholder="Type a message..." />
+    <button onclick="sendChat()">Send</button>
+  </div>
   <div id="loginCommand">Code: /msg AlianskiToJa CODE00</div>
-  <div id="health">Health: 0 / 20</div>
   <div id="coords">Coordinates: X: 0, Y: 0, Z: 0</div>
-  <div id="gui">
-  <h2 id="gui-title"></h2>
-  <ul id="gui-items"></ul>
 </div>
 
   <script src="/socket.io/socket.io.js"></script>
