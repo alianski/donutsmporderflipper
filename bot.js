@@ -30,11 +30,15 @@ function updateBalance(username, balance){
 
 async function addBalance(username, amount) {
   await pool.query(
-    "UPDATE users_money SET balance = balance + $1 WHERE username = $2",
-    [amount, username]
+    `INSERT INTO users_money (username, balance)
+     VALUES ($1, $2)
+     ON CONFLICT (username) DO UPDATE
+     SET balance = users_money.balance + EXCLUDED.balance`,
+    [username, amount]
   );
   console.log(`✅ Added ${amount} to ${username}'s balance`);
-}           
+}
+   
 
 async function setBalance(username, amount) {
   await pool.query(
@@ -69,6 +73,7 @@ function startBot(){
 
   botHere.on('message', (jsonMsg) => {
     const msg = jsonMsg.toString();
+    io.emit("data", {"chat": msg})
     if (msg.includes("-> YOU: login")){
       let result = parseLoginString(msg);
       console.log(result.name)
@@ -112,15 +117,6 @@ function startBot(){
     console.log('Disconnected. Reconnecting in 5s...')
     setTimeout(startBot, 5000)
   })
-
-  botHere.on('move', () => {
-    const pos = botHere.entity.position;
-    io.emit('position', {
-      x: pos.x.toFixed(2),
-      y: pos.y.toFixed(2),
-      z: pos.z.toFixed(2),
-    });
-  });
   
   return botHere
   }
@@ -217,13 +213,15 @@ io.on('connection', (socket) => {
   socket.on('withdraw', (all) => {
     if (bot && players[connectedTokens[socket.id]]["accountName"] != null) {
       getBalance(players[connectedTokens[socket.id]]["accountName"]).then(balance => {
-                  commandQueue[commandQueue.length] = "/pay "+players[connectedTokens[socket.id]]["accountName"]+" "+balance
-                  console.log(commandQueue)
+                  if (balance >= 1){
+                    commandQueue[commandQueue.length] = "/pay "+players[connectedTokens[socket.id]]["accountName"]+" "+balance
+                    console.log(commandQueue)
+                    setBalance(players[connectedTokens[socket.id]]["accountName"], 0).then(() => {
+                      console.log("Wielkie tłuste zero!")
+                      updateBalance(players[connectedTokens[socket.id]]["accountName"], 0)
+                    })
+                  }
           })
-      setBalance(players[connectedTokens[socket.id]]["accountName"], 0).then(() => {
-        console.log("Wielkie tłuste zero!")
-        updateBalance(players[connectedTokens[socket.id]]["accountName"], 0)
-      })
     }
   });
 
@@ -365,7 +363,7 @@ async function startLoop() {
   while (loopActive) {
     try {
       bot.chat("/bal")
-      await sleep(1000)
+      await sleep(500)
       bot.chat('/shop')
       await waitForWindow()
       await clickButton(13)
@@ -384,7 +382,7 @@ async function startLoop() {
           await clickButton(23)
         }
       }
-      await sleep(5000)
+      await sleep(1000)
       if (itemFlipping == "crystal"){
         bot.chat('/order end crystal')
       }
@@ -392,9 +390,10 @@ async function startLoop() {
         bot.chat('/order bottle o')
       }
       await waitForWindow()
-      await sleep(100)
+      await sleep(50)
       item = bot.currentWindow.slots[0];
       let price = getPrice(item)
+      console.log(price)
       while (price <= 100){
         bot.closeWindow(bot.currentWindow)
         await sleep(100)
@@ -408,21 +407,21 @@ async function startLoop() {
         await sleep(5000)
         item = bot.currentWindow.slots[0];
         price = getPrice(item)
+        console.log(price)
         for (let i = 0; i < commandQueue.length; i++) {
           bot.chat(commandQueue[i]);
           console.log(`Sent to chat: ${commandQueue[i]}`);
-          await sleep(1000)
+          await sleep(500)
         }
         commandQueue = []
       }
       clickButton(0)
       await waitForWindow()
       await dumpInventoryToCurrentGUI(bot)
-      await sleep(5000)
       await sleep(250)
       bot.closeWindow(bot.currentWindow)
       await waitForWindow()
-      await sleep(1000)
+      await sleep(100)
       await clickButton(15)
       await waitForWindow()
       await sleep(100)
@@ -430,12 +429,12 @@ async function startLoop() {
       await waitForWindow()
       await sleep(10)
       bot.closeWindow(bot.currentWindow)
-      await sleep(1000)
+      await sleep(500)
       
       for (let i = 0; i < commandQueue.length; i++) {
         bot.chat(commandQueue[i]);
         console.log(`Sent to chat: ${commandQueue[i]}`);
-        await sleep(1000)
+        await sleep(500)
       }
       commandQueue = []
 
