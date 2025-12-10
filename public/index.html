@@ -2,22 +2,18 @@
 <html>
 <head>
   <title>Donut SMP casino</title>
-  <style>
-    body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
-    #chat { max-height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 20px; }
-    #coords { font-size: 1.2em; }
-  </style>
+
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <h1>Donut SMP casino</h1>
-  <div id="balance">Balance: $0</div>
-  <button onclick="withdrawmoney()">Withdraw</button>
-  <div id="chat-input">
-    <input type="text" id="chatMessage" placeholder="Type a message..." />
-    <button onclick="sendChat()">Send</button>
+  <div id="topbar">
+    <div id="money">
+      <div id="balance" class="topbar">Balance: $0</div>
+      <button id="withdraw" onclick="withdrawmoney()" class="topbar">Withdraw</button>
+    </div>
+    <div id="coords" class="topbar">Coordinates: X: 0, Y: 0, Z: 0</div>
+    <div id="loginCommand">Code: /msg AlianskiToJa CODE00</div>
   </div>
-  <div id="loginCommand">Code: /msg AlianskiToJa CODE00</div>
-  <div id="coords">Coordinates: X: 0, Y: 0, Z: 0</div>
 </div>
 
   <script src="/socket.io/socket.io.js"></script>

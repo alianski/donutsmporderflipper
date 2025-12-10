@@ -10,14 +10,6 @@ let loginCode = null
 let balance = 0
 let botBalance = 0
 
-function sendChat() {
-  const msg = document.getElementById('chatMessage').value;
-  if (msg.trim()) {
-    socket.emit('sendChat', msg);
-    document.getElementById('chatMessage').value = '';
-  }
-}
-
 function withdrawmoney() {
   socket.emit("withdraw", true)
 }
@@ -30,6 +22,28 @@ socket.on('chat', data => {
   console.log(data)
   chatBox.scrollTop = chatBox.scrollHeight;
 });
+
+
+function fitText(el) {
+  const parentHeight = el.offsetHeight;
+  const parentWidth = el.offsetWidth;
+
+  let fontSize = 100; // start large
+  el.style.fontSize = fontSize + "px";
+
+  // shrink until it fits both width and height
+  while (
+    (el.scrollWidth > parentWidth || el.scrollHeight > parentHeight) &&
+    fontSize > 1
+  ) {
+    fontSize--;
+    el.style.fontSize = fontSize + "px";
+  }
+}
+
+
+
+
 
 
 
@@ -67,6 +81,9 @@ socket.on("data", data => {
       botBalance = data["botBalance"]
     }
     document.getElementById('balance').textContent = "Balance: $"+formatNumber(balance)+" /$"+formatNumber(botBalance)
+    if ("chat" in data){
+      document.getElementById("coords").textContent = data["chat"]
+    }
 })
 
 socket.on('position', pos => {

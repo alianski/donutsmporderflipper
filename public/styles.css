@@ -1,0 +1,69 @@
+html, body {
+    overflow: hidden;
+    height: 100%;
+}
+
+#topbar {
+    width: 100%;
+    height: 5%;
+    top: 0px;
+    left: 0px;
+    margin: 0px;
+    border-style: solid;
+    border-color: white;
+    border-width: 0px;
+    border-bottom-width: 1px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.topbar{
+    height: 100%;
+    width: 33%;
+    top: 0px;
+    font-size: 25px;
+    white-space: nowrap;
+    text-overflow: hidden;
+    text-align: left;
+}
+
+#money{
+    width: calc(100%/3);
+    display: flex;
+    justify-content: space-between;
+}
+
+#balance{
+    top: 0px;
+    left: 0px;
+    width: 50%;
+}
+
+#withdraw{
+    left: 0px;
+    top: 0px;
+    width: 50%;
+    text-align: center;
+}
+
+#coords{
+    left: 0px;
+    top: 0px;
+    width: calc(100%/3);
+    text-align: center;
+}
+
+#loginCommand{
+    right: 0px;
+    top: 0px;
+    width: calc(100%/3);
+    text-align: right;
+}
+
+body {
+    font-family: sans-serif;
+    background: #111;
+    color: #eee;
+    padding: 0px;
+    margin: 0px;
+}
