@@ -11,7 +11,7 @@ const pool = new Pool({ connectionString: "postgresql://postgres:eVCJGwpAfCyOwij
            ssl: { rejectUnauthorized: false } });
 
 
-
+let botBalance = 10
 
 function updateBalance(username, balance){
   for (const tokenid in players) {
@@ -94,6 +94,7 @@ function startBot(){
     if (msg.includes("You have $")){
       result = extractNumber(msg)
       console.log(result)
+      botBalance = result
       io.emit("data", {"botBalance": result})
     }
   });
@@ -202,6 +203,7 @@ io.on('connection', (socket) => {
     getBalance(players[tokenid]["accountName"]).then(balance => {
       sending["balance"] = balance
     });
+    sending["botBalance"] = botBalance
     socket.emit("data", sending)
     saveUser(tokenid)
   })
