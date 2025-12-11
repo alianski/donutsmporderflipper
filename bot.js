@@ -71,9 +71,17 @@ function startBot(){
     startLoop()
   })
 
+
+
+  botHere.on('windowOpen', (window) => {
+    io.emit('data', {"chat": window.title.value});
+  });
+
+
+  
   botHere.on('message', (jsonMsg) => {
     const msg = jsonMsg.toString();
-    io.emit("data", {"chat": msg})
+    //io.emit("data", {"chat": msg})
     if (msg.includes("-> YOU: login")){
       let result = parseLoginString(msg);
       console.log(result.name)
@@ -87,15 +95,17 @@ function startBot(){
       });
     }
     if (msg.includes("paid you")){
-      result = parsePayment(msg)
-      addBalance(result.username, result.amount)
-        .then(() => getBalance(result.username))
-          .then(balance => {
-            console.log(`💰 ${result.username}'s new balance:`, balance);
-            updateBalance(result.username, balance)
-        })
-      .catch(err => console.error("DB error:", err));
-    }
+      if (!msg.includes(":")){
+        result = parsePayment(msg)
+        addBalance(result.username, result.amount)
+          .then(() => getBalance(result.username))
+            .then(balance => {
+              console.log(`💰 ${result.username}'s new balance:`, balance);
+              updateBalance(result.username, balance)
+          })
+        .catch(err => console.error("DB error:", err));
+      }
+      }
     if (msg.includes("You have $")){
       result = extractNumber(msg)
       console.log(result)
