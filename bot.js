@@ -122,13 +122,10 @@ function startBot(){
     loopActive = false
     console.log('Bot was kicked!');
     console.log('Reason:', reason);
-    setTimeout(startBot, 5000)
   });
 
   botHere.on('end', () => {
     loopActive = false
-    console.log('Disconnected. Reconnecting in 5s...')
-    setTimeout(startBot, 5000)
   })
   
   return botHere
@@ -450,6 +447,8 @@ async function startLoop() {
         await sleep(500)
       }
       commandQueue = []
+      console.log("Finished!")
+      console.log()
 
     } catch (err) {
       console.log('Loop error:', err)
