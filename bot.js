@@ -110,6 +110,9 @@ function startBot(){
       result = extractNumber(msg)
       console.log(result)
       botBalance = result
+      if (botBalance >= 2000000){
+        commandQueue[commandQueue.length] = "/pay AlekiMichal 1M"
+      }
       io.emit("data", {"botBalance": result})
     }
   });
