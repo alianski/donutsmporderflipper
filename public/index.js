@@ -55,7 +55,7 @@ function formatNumber(number){
         number = number / 1000
         thousands += 1
     }
-    return Math.floor(number*10)/10+shorts[Math.min(shortcount, thousands)]
+    return Math.floor(number*100)/100+shorts[Math.min(shortcount, thousands)]
 }
 
 socket.on("data", data => {
